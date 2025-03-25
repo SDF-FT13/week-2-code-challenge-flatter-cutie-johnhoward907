@@ -21,6 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function addCharacterToBar(character) {
         const span = document.createElement("span");
         span.textContent = character.name;
+        span.dataset.id = character.id; // Store ID for deletion
         span.addEventListener("click", () => displayCharacterDetails(character));
         characterBar.appendChild(span);
     }
@@ -36,15 +37,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 <input type="number" id="vote-input" min="1" placeholder="Enter votes">
                 <button type="submit">Vote</button>
             </form>
-            <button id="reset-votes-btn">Reset Votes</button> <!-- Reset Button Added -->
+            <button id="reset-votes-btn">Reset Votes</button>
+            <button id="remove-character-btn">Remove Character</button> <!-- Remove Button Added -->
         `;
 
-        // Attach event listeners to the new elements
+        // Attach event listeners to new elements
         document.getElementById("votes-form").addEventListener("submit", handleVote);
         document.getElementById("reset-votes-btn").addEventListener("click", resetVotes);
+        document.getElementById("remove-character-btn").addEventListener("click", removeCharacter);
     }
 
-    /** Handle voting */
+    /** Handle voting (No persistence) */
     function handleVote(event) {
         event.preventDefault();
         if (!currentCharacter) {
@@ -60,20 +63,10 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        let updatedVotes = currentCharacter.votes + newVotes;
-        document.getElementById("vote-count").textContent = updatedVotes;
-
-        // Persist votes to server
-        fetch(`${baseUrl}/${currentCharacter.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ votes: updatedVotes })
-        })
-        .then(response => response.json())
-        .then(updatedCharacter => {
-            currentCharacter.votes = updatedCharacter.votes;
-        })
-        .catch(error => console.error("Error updating votes:", error));
+        // Update votes in the UI only (No Server Request)
+        let voteCountElement = document.getElementById("vote-count");
+        currentCharacter.votes += newVotes; // Update local state
+        voteCountElement.textContent = currentCharacter.votes; // Update UI
 
         voteInput.value = ""; // Clear input field
     }
@@ -87,15 +80,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
         currentCharacter.votes = 0;
         document.getElementById("vote-count").textContent = 0;
+    }
 
-        // Persist reset to server
+    /** Handle removing a character */
+    function removeCharacter() {
+        if (!currentCharacter) {
+            alert("Select a character first!");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to remove ${currentCharacter.name}?`)) {
+            return;
+        }
+
+        // Send DELETE request to remove character from the server
         fetch(`${baseUrl}/${currentCharacter.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ votes: 0 })
+            method: "DELETE"
         })
-        .then(response => response.json())
-        .catch(error => console.error("Error resetting votes:", error));
+        .then(() => {
+            // Remove from UI
+            let characterElement = document.querySelector(`[data-id="${currentCharacter.id}"]`);
+            if (characterElement) {
+                characterElement.remove();
+            }
+            detailedInfo.innerHTML = ""; // Clear character details
+            currentCharacter = null;
+        })
+        .catch(error => console.error("Error deleting character:", error));
     }
 
     /** Handle adding a new character */
